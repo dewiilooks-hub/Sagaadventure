@@ -17,7 +17,7 @@ import {
 } from 'lucide-react';
 import BrandLogo from './BrandLogo';
 import { RentalItem, CustomRentalItem, ViewMode } from '../types';
-import { db, appId, getBestCollection } from '../services/firebase';
+import { db, appId } from '../services/firebase';
 
 const ITEMS: RentalItem[] = [
   { id: 1, name: "Tent Double Layer 4P", price: 60000, stok: 10 },
@@ -86,14 +86,13 @@ const RentalPage: React.FC<RentalPageProps> = ({ onBack }) => {
   }, [pickupDate, returnDate]);
 
   useEffect(() => {
-    const col = getBestCollection('saga_rentals');
-    if (!db || !col) {
+    if (!db) {
       const local = localStorage.getItem(`saga_rentals_${appId}`);
       if (local) setRecapData(JSON.parse(local));
       return;
     }
 
-    const q = col.orderBy('createdAt', 'desc');
+    const q = db.collection('artifacts').doc(appId).collection('public').doc('data').collection('saga_rentals').orderBy('createdAt', 'desc');
     const unsubscribe = q.onSnapshot((snapshot) => {
       setRecapData(snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() })));
     });
@@ -219,8 +218,7 @@ const RentalPage: React.FC<RentalPageProps> = ({ onBack }) => {
         const existing = JSON.parse(localStorage.getItem(`saga_rentals_${appId}`) || '[]');
         localStorage.setItem(`saga_rentals_${appId}`, JSON.stringify([payload, ...existing]));
       } else {
-        const col = getBestCollection('saga_rentals');
-        if (col) await col.add(payload);
+        await db.collection('artifacts').doc(appId).collection('public').doc('data').collection('saga_rentals').add(payload);
       }
       if (!silent) alert(`Data Tersimpan`);
     } catch (e) {
@@ -254,8 +252,7 @@ const RentalPage: React.FC<RentalPageProps> = ({ onBack }) => {
         const existing = JSON.parse(localStorage.getItem(`saga_rentals_${appId}`) || '[]');
         localStorage.setItem(`saga_rentals_${appId}`, JSON.stringify([payload, ...existing]));
       } else {
-        const col = getBestCollection('saga_rentals');
-        if (col) await col.add(payload);
+        await db.collection('artifacts').doc(appId).collection('public').doc('data').collection('saga_rentals').add(payload);
       }
       if (!silent) alert("Data Ganti Rugi Berhasil Disimpan");
     } catch (e) {
@@ -292,8 +289,7 @@ const RentalPage: React.FC<RentalPageProps> = ({ onBack }) => {
     if (!window.confirm("Hapus permanen data transaksi ini?")) return;
     if (db) {
       try {
-        const col = getBestCollection('saga_rentals');
-        if (col) await col.doc(id).delete();
+        await db.collection('artifacts').doc(appId).collection('public').doc('data').collection('saga_rentals').doc(id).delete();
       } catch (e) { alert("Gagal menghapus data di cloud."); }
     } else {
       const local = JSON.parse(localStorage.getItem(`saga_rentals_${appId}`) || '[]');

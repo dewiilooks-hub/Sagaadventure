@@ -16,7 +16,7 @@ import {
   HardHat, BookOpen, Info, PhoneCall, HeartPulse,
   XCircle
 } from 'lucide-react';
-import { db, appId, getBestCollection } from '../services/firebase';
+import { db, appId } from '../services/firebase';
 import { OpenTripTask, TripEvent, TripExpense, StaffAttendance } from '../types';
 import BrandLogo from './BrandLogo';
 import TicketPage from './TicketPage';
@@ -68,7 +68,7 @@ const OpenTripPage: React.FC<OpenTripPageProps> = ({ user, onBack }) => {
     name: '', date: '', pic: '', location: '', status: 'planning' as TripEvent['status']
   });
 
-  const isDemoMode = !db || !getBestCollection('saga_tasks') || !getBestCollection('saga_trips') || !getBestCollection('saga_attendance');
+  const isDemoMode = !db;
 
   // Load Data
   useEffect(() => {
@@ -82,19 +82,15 @@ const OpenTripPage: React.FC<OpenTripPageProps> = ({ user, onBack }) => {
       return;
     }
     
-    const tasksCol = getBestCollection('saga_tasks');
-    const tripsCol = getBestCollection('saga_trips');
-    const attendCol = getBestCollection('saga_attendance');
-
-    const unsubTasks = tasksCol!
+    const unsubTasks = db!.collection('artifacts').doc(appId).collection('public').doc('data').collection('saga_tasks')
       .orderBy('createdAt', 'desc')
       .onSnapshot((s) => setTasks(s.docs.map(d => ({ id: d.id, ...d.data() })) as OpenTripTask[]));
 
-    const unsubTrips = tripsCol!
+    const unsubTrips = db!.collection('artifacts').doc(appId).collection('public').doc('data').collection('saga_trips')
       .orderBy('createdAt', 'desc')
       .onSnapshot((s) => setTrips(s.docs.map(d => ({ id: d.id, ...d.data() })) as TripEvent[]));
 
-    const unsubAttend = attendCol!
+    const unsubAttend = db!.collection('artifacts').doc(appId).collection('public').doc('data').collection('saga_attendance')
       .orderBy('timestamp', 'desc')
       .onSnapshot((s) => setAttendance(s.docs.map(d => ({ id: d.id, ...d.data() })) as StaffAttendance[]));
 
@@ -116,8 +112,7 @@ const OpenTripPage: React.FC<OpenTripPageProps> = ({ user, onBack }) => {
     if (isDemoMode) {
       setTrips([{ id: Date.now().toString(), ...data } as any, ...trips]);
     } else {
-      const tripsCol = getBestCollection('saga_trips');
-      if (tripsCol) await tripsCol.add(data);
+      await db!.collection('artifacts').doc(appId).collection('public').doc('data').collection('saga_trips').add(data);
     }
     setTripForm({ name: '', date: '', pic: '', location: '', status: 'planning' });
     setShowAddProject(false);
@@ -129,8 +124,7 @@ const OpenTripPage: React.FC<OpenTripPageProps> = ({ user, onBack }) => {
     if (isDemoMode) {
       setAttendance([{ id: Date.now().toString(), ...data } as StaffAttendance, ...attendance]);
     } else {
-      const attendCol = getBestCollection('saga_attendance');
-      if (attendCol) await attendCol.add(data);
+      await db!.collection('artifacts').doc(appId).collection('public').doc('data').collection('saga_attendance').add(data);
     }
     setAttendForm({ staffName: '', role: '', status: 'hadir', tripId: '' });
   };
@@ -140,8 +134,7 @@ const OpenTripPage: React.FC<OpenTripPageProps> = ({ user, onBack }) => {
     if (isDemoMode) {
       setAttendance(attendance.filter(a => a.id !== id));
     } else {
-      const attendCol = getBestCollection('saga_attendance');
-      if (attendCol) await attendCol.doc(id).delete();
+      await db!.collection('artifacts').doc(appId).collection('public').doc('data').collection('saga_attendance').doc(id).delete();
     }
   };
 
@@ -151,8 +144,7 @@ const OpenTripPage: React.FC<OpenTripPageProps> = ({ user, onBack }) => {
       setTrips(trips.filter(t => t.id !== id));
     } else {
       try {
-        const tripsCol = getBestCollection('saga_trips');
-        if (tripsCol) await tripsCol.doc(id).delete();
+        await db!.collection('artifacts').doc(appId).collection('public').doc('data').collection('saga_trips').doc(id).delete();
       } catch (err) {
         alert("Gagal menghapus proyek.");
       }
@@ -164,8 +156,7 @@ const OpenTripPage: React.FC<OpenTripPageProps> = ({ user, onBack }) => {
     if (isDemoMode) {
       setTasks([{ id: Date.now().toString(), ...finalData } as any, ...tasks]);
     } else {
-      const tasksCol = getBestCollection('saga_tasks');
-      if (tasksCol) await tasksCol.add(finalData);
+      await db!.collection('artifacts').doc(appId).collection('public').doc('data').collection('saga_tasks').add(finalData);
     }
   };
 
@@ -187,8 +178,7 @@ const OpenTripPage: React.FC<OpenTripPageProps> = ({ user, onBack }) => {
     if (isDemoMode) {
       setTasks([{ id: Date.now().toString(), ...data } as any, ...tasks]);
     } else {
-      const tasksCol = getBestCollection('saga_tasks');
-      if (tasksCol) await tasksCol.add(data);
+      await db!.collection('artifacts').doc(appId).collection('public').doc('data').collection('saga_tasks').add(data);
     }
     setFormData({ name: '', pic: '', qty: 1, unit: '', price: '', status: '', tripId: '' });
   };
@@ -204,8 +194,7 @@ const OpenTripPage: React.FC<OpenTripPageProps> = ({ user, onBack }) => {
     if (isDemoMode) {
         setTasks(tasks.map(t => t.id === id ? { ...t, ...updated } : t));
     } else {
-        const tasksCol = getBestCollection('saga_tasks');
-        if (tasksCol) await tasksCol.doc(id).update(updated);
+        await db!.collection('artifacts').doc(appId).collection('public').doc('data').collection('saga_tasks').doc(id).update(updated);
     }
     setEditingId(null);
     setEditFormData(null);
@@ -217,8 +206,7 @@ const OpenTripPage: React.FC<OpenTripPageProps> = ({ user, onBack }) => {
         setTasks(tasks.filter(t => t.id !== id));
     } else {
         try {
-          const tasksCol = getBestCollection('saga_tasks');
-          if (tasksCol) await tasksCol.doc(id).delete();
+          await db!.collection('artifacts').doc(appId).collection('public').doc('data').collection('saga_tasks').doc(id).delete();
         } catch (e) {
           alert("Gagal menghapus data.");
         }
@@ -722,10 +710,7 @@ const OpenTripPage: React.FC<OpenTripPageProps> = ({ user, onBack }) => {
                                <button onClick={async () => {
                                   const n = tasks.map(t => t.id === item.id ? { ...t, isDone: !t.isDone } : t);
                                   setTasks(n);
-                                  if (!isDemoMode) {
-                                    const tasksCol = getBestCollection('saga_tasks');
-                                    if (tasksCol) await tasksCol.doc(item.id).update({ isDone: !item.isDone });
-                                  }
+                                  if (!isDemoMode) await db!.collection('artifacts').doc(appId).collection('public').doc('data').collection('saga_tasks').doc(item.id).update({ isDone: !item.isDone });
                                }} className={`w-6 h-6 rounded-lg mx-auto flex items-center justify-center transition-all ${item.isDone ? 'bg-emerald-500 text-white shadow-md' : 'bg-white text-stone-100 border'}`}>
                                   {item.isDone ? <CheckCircle2 size={12} /> : <Square size={12} />}
                                </button>

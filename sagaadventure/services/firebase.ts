@@ -13,17 +13,6 @@ let auth: firebase.auth.Auth | null = null;
 let db: firebase.firestore.Firestore | null = null;
 let isCloudEnabled = false;
 
-// Default Firebase config (embedded) — enables Auth/Firestore without requiring users to paste JSON.
-// This does NOT change the UI; it only removes the need for manual setup.
-const defaultFirebaseConfig = {
-  apiKey: "AIzaSyAg13IhTcIa9589AIID4Rb5YZxbdFrh-h0",
-  authDomain: "sagaadventure-dd638.firebaseapp.com",
-  projectId: "sagaadventure-dd638",
-  storageBucket: "sagaadventure-dd638.firebasestorage.app",
-  messagingSenderId: "626572110187",
-  appId: "1:626572110187:web:be01813f1eecd02387042e",
-};
-
 // Function to safely initialize Firebase
 const initializeFirebase = (config: any) => {
   if (config && config.apiKey && config.apiKey !== "dummy") {
@@ -67,41 +56,5 @@ if (!isCloudEnabled) {
   }
 }
 
-// 3. Final fallback: use embedded default config
-if (!isCloudEnabled) {
-  initializeFirebase(defaultFirebaseConfig);
-}
-
 export { auth, db, isCloudEnabled };
 export const appId = typeof (window as any).__app_id !== 'undefined' ? (window as any).__app_id : 'default-app-id';
-
-/**
- * Returns a per-user, per-app collection reference.
- * Data will live under: users/{uid}/apps/{appId}/{collectionName}
- */
-export const getUserCollection = (collectionName: string): firebase.firestore.CollectionReference | null => {
-  if (!db || !auth || !auth.currentUser) return null;
-  const uid = auth.currentUser.uid;
-  return db
-    .collection('users')
-    .doc(uid)
-    .collection('apps')
-    .doc(appId)
-    .collection(collectionName);
-};
-
-/** Legacy public path used by older builds (kept for backward compatibility) */
-export const getLegacyPublicCollection = (collectionName: string): firebase.firestore.CollectionReference | null => {
-  if (!db) return null;
-  return db
-    .collection('artifacts')
-    .doc(appId)
-    .collection('public')
-    .doc('data')
-    .collection(collectionName);
-};
-
-/** Prefer per-user collection; fallback to legacy path if needed */
-export const getBestCollection = (collectionName: string): firebase.firestore.CollectionReference | null => {
-  return getUserCollection(collectionName) ?? getLegacyPublicCollection(collectionName);
-};

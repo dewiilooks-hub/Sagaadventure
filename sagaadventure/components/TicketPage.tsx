@@ -10,7 +10,7 @@ import {
   PhoneCall, HeartPulse, ShieldCheck, ShieldAlert, HardHat, Info,
   QrCode, Barcode, FileText, FileDown, Activity, ListChecks
 } from 'lucide-react';
-import { db, appId, getBestCollection } from '../services/firebase';
+import { db, appId } from '../services/firebase';
 import { TripEvent } from '../types';
 import BrandLogo from './BrandLogo';
 
@@ -71,7 +71,7 @@ const TicketPage: React.FC<TicketPageProps> = ({ onBack, trips = [], onSave }) =
   const scannerRef = useRef<Html5Qrcode | null>(null);
   const ticketRef = useRef<HTMLDivElement>(null);
 
-  const isDemoMode = !db || !getBestCollection('scans');
+  const isDemoMode = !db;
 
   useEffect(() => {
     if (isDemoMode) {
@@ -80,8 +80,7 @@ const TicketPage: React.FC<TicketPageProps> = ({ onBack, trips = [], onSave }) =
       return;
     }
 
-    const scansCol = getBestCollection('scans');
-    const unsub = scansCol!
+    const unsub = db!.collection('artifacts').doc(appId).collection('public').doc('data').collection('scans')
       .onSnapshot(snapshot => {
         const data = snapshot.docs.map(doc => ({ _id: doc.id, ...doc.data() }));
         data.sort((a: any, b: any) => new Date(b.timestamp).getTime() - new Date(a.timestamp).getTime());
@@ -112,17 +111,26 @@ const TicketPage: React.FC<TicketPageProps> = ({ onBack, trips = [], onSave }) =
   const downloadTicketPDF = async () => {
     if (!ticketRef.current) return;
     setIsProcessing(true);
+    const el = ticketRef.current;
     try {
+      // Wait until fonts are ready so html2canvas doesn't capture with wrong font metrics
+      // which can cause text to be clipped in the resulting canvas/PDF.
+      // @ts-ignore
+      if (document.fonts?.ready) await document.fonts.ready;
+
+      // Enable export-only CSS tweaks (keeps normal UI unchanged)
+      el.setAttribute('data-exporting', 'true');
+
       // Optimizing for High Resolution PDF output
-      const canvas = await html2canvas(ticketRef.current, { 
+      const canvas = await html2canvas(el, { 
         scale: 4, 
         useCORS: true,
         backgroundColor: "#ffffff",
         logging: false,
         scrollX: 0,
         scrollY: -window.scrollY,
-        windowWidth: ticketRef.current.scrollWidth,
-        windowHeight: ticketRef.current.scrollHeight
+        windowWidth: el.scrollWidth,
+        windowHeight: el.scrollHeight
       });
       
       const imgData = canvas.toDataURL('image/jpeg', 1.0);
@@ -138,6 +146,7 @@ const TicketPage: React.FC<TicketPageProps> = ({ onBack, trips = [], onSave }) =
       console.error(err);
       alert("Gagal mengunduh PDF tiket.");
     } finally {
+      el.removeAttribute('data-exporting');
       setIsProcessing(false);
     }
   };
@@ -218,8 +227,7 @@ const TicketPage: React.FC<TicketPageProps> = ({ onBack, trips = [], onSave }) =
         setScanHistory(newList);
         localStorage.setItem(`saga_tickets_scans_${appId}`, JSON.stringify(newList));
       } else {
-        const scansCol = getBestCollection('scans');
-        if (scansCol) await scansCol.add(validatedData);
+        await db!.collection('artifacts').doc(appId).collection('public').doc('data').collection('scans').add(validatedData);
       }
     } else {
       setScanFeedback('error');
@@ -431,7 +439,7 @@ const TicketPage: React.FC<TicketPageProps> = ({ onBack, trips = [], onSave }) =
 
                   <div className="mt-8 bg-black/60 border border-white/10 rounded-3xl p-6 flex flex-col">
                      <p className="text-[8px] uppercase font-black text-white/30 tracking-[0.2em] mb-2">Authenticated Ticket Holder</p>
-                     <p className="font-black text-2xl truncate uppercase tracking-tighter text-white leading-none mb-1">
+                     <p className="ticket-holder-name font-black text-2xl truncate uppercase tracking-tighter text-white leading-none mb-1">
                         {ticketData.guest || '........'}
                      </p>
                      <p className="text-[10px] font-bold text-white/50 tracking-wider">ID: {ticketData.id}</p>
