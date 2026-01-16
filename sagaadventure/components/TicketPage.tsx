@@ -112,6 +112,13 @@ const TicketPage: React.FC<TicketPageProps> = ({ onBack, trips = [], onSave }) =
     if (!ticketRef.current) return;
     setIsProcessing(true);
     try {
+      // Ensure web fonts are fully loaded before capture (prevents text metric shifts)
+      // @ts-ignore
+      if (document.fonts?.ready) await (document.fonts.ready);
+
+      // Enable export-only CSS tweaks to prevent text clipping in html2canvas
+      ticketRef.current.setAttribute('data-exporting', 'true');
+
       // Optimizing for High Resolution PDF output
       const canvas = await html2canvas(ticketRef.current, { 
         scale: 4, 
@@ -137,6 +144,8 @@ const TicketPage: React.FC<TicketPageProps> = ({ onBack, trips = [], onSave }) =
       console.error(err);
       alert("Gagal mengunduh PDF tiket.");
     } finally {
+      // Always restore normal UI styling
+      ticketRef.current?.removeAttribute('data-exporting');
       setIsProcessing(false);
     }
   };
@@ -429,7 +438,7 @@ const TicketPage: React.FC<TicketPageProps> = ({ onBack, trips = [], onSave }) =
 
                   <div className="mt-8 bg-black/60 border border-white/10 rounded-3xl p-6 flex flex-col">
                      <p className="text-[8px] uppercase font-black text-white/30 tracking-[0.2em] mb-2">Authenticated Ticket Holder</p>
-                     <p className="font-black text-2xl truncate uppercase tracking-tighter text-white leading-none mb-1">
+                     <p className="ticket-holder-name font-black text-2xl truncate uppercase tracking-tighter text-white leading-none mb-1">
                         {ticketData.guest || '........'}
                      </p>
                      <p className="text-[10px] font-bold text-white/50 tracking-wider">ID: {ticketData.id}</p>

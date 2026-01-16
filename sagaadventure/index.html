@@ -46,6 +46,18 @@
         ::-webkit-scrollbar-thumb:hover {
           background: #d4d4d4;
         }
+
+        /* --- Export-only tweaks (html2canvas/pdf) --- */
+        [data-exporting="true"] {
+          /* prevent any accidental clipping during canvas capture */
+          overflow: visible !important;
+        }
+        [data-exporting="true"] .ticket-holder-name {
+          /* html2canvas sometimes crops the top of heavy glyphs; add safe padding */
+          line-height: 1.25 !important;
+          padding-top: 6px !important;
+          display: inline-block;
+        }
     </style>
 <script type="importmap">
 {
