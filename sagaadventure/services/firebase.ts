@@ -1,4 +1,3 @@
-
 import firebase from "firebase/compat/app";
 import "firebase/compat/auth";
 import "firebase/compat/firestore";
@@ -10,57 +9,99 @@ declare global {
   var __initial_auth_token: string | undefined;
 }
 
-// Fixed: Using compat types for Firebase v8 style code
 let auth: firebase.auth.Auth | null = null;
 let db: firebase.firestore.Firestore | null = null;
+let isCloudEnabled = false;
 
-// Your Firebase Web App config (hardcoded as requested)
-// NOTE: This is safe to be public; the real security is handled by Firebase Security Rules.
-const hardcodedFirebaseConfig = {
+// Default Firebase config (embedded) — enables Auth/Firestore without requiring users to paste JSON.
+// This does NOT change the UI; it only removes the need for manual setup.
+const defaultFirebaseConfig = {
   apiKey: "AIzaSyAg13IhTcIa9589AIID4Rb5YZxbdFrh-h0",
   authDomain: "sagaadventure-dd638.firebaseapp.com",
   projectId: "sagaadventure-dd638",
   storageBucket: "sagaadventure-dd638.firebasestorage.app",
   messagingSenderId: "626572110187",
-  appId: "1:626572110187:web:be01813f1eecd02387042e"
+  appId: "1:626572110187:web:be01813f1eecd02387042e",
 };
 
-const configStr = typeof window !== 'undefined' ? (window as any).__firebase_config : undefined;
-
-// Fallback for normal Vite/React deployments (no didn’t set __firebase_config)
-const envConfig = typeof import.meta !== 'undefined' ? {
-  apiKey: (import.meta as any).env?.VITE_FIREBASE_API_KEY,
-  authDomain: (import.meta as any).env?.VITE_FIREBASE_AUTH_DOMAIN,
-  projectId: (import.meta as any).env?.VITE_FIREBASE_PROJECT_ID,
-  storageBucket: (import.meta as any).env?.VITE_FIREBASE_STORAGE_BUCKET,
-  messagingSenderId: (import.meta as any).env?.VITE_FIREBASE_MESSAGING_SENDER_ID,
-  appId: (import.meta as any).env?.VITE_FIREBASE_APP_ID,
-} : null;
-
-if (configStr && configStr !== "{}" && !configStr.includes("YOUR_FIREBASE_CONFIG")) {
-  try {
-    const firebaseConfig = JSON.parse(configStr);
-    // Only initialize if we have a seemingly valid API Key
-    if (firebaseConfig.apiKey && firebaseConfig.apiKey !== "dummy") {
-      const app = firebase.initializeApp(firebaseConfig);
-      // Fixed: Using compat methods for Firebase v8 style code
+// Function to safely initialize Firebase
+const initializeFirebase = (config: any) => {
+  if (config && config.apiKey && config.apiKey !== "dummy") {
+    try {
+      // Use existing app if already initialized, or create new one
+      const app = !firebase.apps.length ? firebase.initializeApp(config) : firebase.app();
       auth = app.auth();
       db = app.firestore();
+      isCloudEnabled = true;
+      return true;
+    } catch (e) {
+      console.error("Firebase Init Error:", e);
+      return false;
     }
-  } catch (error) {
-    console.warn("Firebase config found but failed to parse or initialize:", error);
   }
-} else {
-  // No __firebase_config: try env vars, otherwise use the hardcoded config
-  try {
-    const cfg = (envConfig?.apiKey ? envConfig : hardcodedFirebaseConfig) as any;
-    const app = firebase.apps.length ? firebase.app() : firebase.initializeApp(cfg);
-    auth = app.auth();
-    db = app.firestore();
-  } catch (e) {
-    console.info("Firebase configuration is missing or invalid. App will run in Demo Mode (Local Storage).", e);
+  return false;
+};
+
+// 1. Check for user-defined config in localStorage first (for cross-device manual setup)
+if (typeof window !== 'undefined') {
+  const savedConfig = localStorage.getItem('saga_user_firebase_config');
+  if (savedConfig) {
+    try {
+      initializeFirebase(JSON.parse(savedConfig));
+    } catch (e) {
+      console.warn("Saved Firebase config is invalid, clearing...");
+      localStorage.removeItem('saga_user_firebase_config');
+    }
   }
 }
 
-export { auth, db };
+// 2. Fallback to global config if not yet enabled
+if (!isCloudEnabled) {
+  const configStr = typeof window !== 'undefined' ? (window as any).__firebase_config : undefined;
+  if (configStr && configStr !== "{}" && !configStr.includes("YOUR_FIREBASE_CONFIG")) {
+    try {
+      initializeFirebase(JSON.parse(configStr));
+    } catch (error) {
+      console.warn("Global Firebase config failed to initialize");
+    }
+  }
+}
+
+// 3. Final fallback: use embedded default config
+if (!isCloudEnabled) {
+  initializeFirebase(defaultFirebaseConfig);
+}
+
+export { auth, db, isCloudEnabled };
 export const appId = typeof (window as any).__app_id !== 'undefined' ? (window as any).__app_id : 'default-app-id';
+
+/**
+ * Returns a per-user, per-app collection reference.
+ * Data will live under: users/{uid}/apps/{appId}/{collectionName}
+ */
+export const getUserCollection = (collectionName: string): firebase.firestore.CollectionReference | null => {
+  if (!db || !auth || !auth.currentUser) return null;
+  const uid = auth.currentUser.uid;
+  return db
+    .collection('users')
+    .doc(uid)
+    .collection('apps')
+    .doc(appId)
+    .collection(collectionName);
+};
+
+/** Legacy public path used by older builds (kept for backward compatibility) */
+export const getLegacyPublicCollection = (collectionName: string): firebase.firestore.CollectionReference | null => {
+  if (!db) return null;
+  return db
+    .collection('artifacts')
+    .doc(appId)
+    .collection('public')
+    .doc('data')
+    .collection(collectionName);
+};
+
+/** Prefer per-user collection; fallback to legacy path if needed */
+export const getBestCollection = (collectionName: string): firebase.firestore.CollectionReference | null => {
+  return getUserCollection(collectionName) ?? getLegacyPublicCollection(collectionName);
+};

@@ -17,8 +17,7 @@ import {
 } from 'lucide-react';
 import BrandLogo from './BrandLogo';
 import { RentalItem, CustomRentalItem, ViewMode } from '../types';
-import { db, appId } from '../services/firebase';
-import { sagaCollection } from '../services/dbPaths';
+import { db, appId, getBestCollection } from '../services/firebase';
 
 const ITEMS: RentalItem[] = [
   { id: 1, name: "Tent Double Layer 4P", price: 60000, stok: 10 },
@@ -40,12 +39,11 @@ const ITEMS: RentalItem[] = [
 
 interface RentalPageProps {
   onBack: () => void;
-  user: firebase.User | null;
 }
 
 type RentalSubView = 'dashboard' | 'catalog' | 'invoice' | 'damage' | 'damage_invoice' | 'recap' | 'terms' | 'monthly_report';
 
-const RentalPage: React.FC<RentalPageProps> = ({ onBack, user }) => {
+const RentalPage: React.FC<RentalPageProps> = ({ onBack }) => {
   const [subView, setSubView] = useState<RentalSubView>('dashboard');
   const [cart, setCart] = useState<Record<number, number>>({});
   const [customerName, setCustomerName] = useState('');
@@ -88,13 +86,14 @@ const RentalPage: React.FC<RentalPageProps> = ({ onBack, user }) => {
   }, [pickupDate, returnDate]);
 
   useEffect(() => {
-    if (!db) {
+    const col = getBestCollection('saga_rentals');
+    if (!db || !col) {
       const local = localStorage.getItem(`saga_rentals_${appId}`);
       if (local) setRecapData(JSON.parse(local));
       return;
     }
 
-    const q = sagaCollection('saga_rentals', user)!.orderBy('createdAt', 'desc');
+    const q = col.orderBy('createdAt', 'desc');
     const unsubscribe = q.onSnapshot((snapshot) => {
       setRecapData(snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() })));
     });
@@ -220,7 +219,8 @@ const RentalPage: React.FC<RentalPageProps> = ({ onBack, user }) => {
         const existing = JSON.parse(localStorage.getItem(`saga_rentals_${appId}`) || '[]');
         localStorage.setItem(`saga_rentals_${appId}`, JSON.stringify([payload, ...existing]));
       } else {
-        await sagaCollection('saga_rentals', user)!.add(payload);
+        const col = getBestCollection('saga_rentals');
+        if (col) await col.add(payload);
       }
       if (!silent) alert(`Data Tersimpan`);
     } catch (e) {
@@ -254,7 +254,8 @@ const RentalPage: React.FC<RentalPageProps> = ({ onBack, user }) => {
         const existing = JSON.parse(localStorage.getItem(`saga_rentals_${appId}`) || '[]');
         localStorage.setItem(`saga_rentals_${appId}`, JSON.stringify([payload, ...existing]));
       } else {
-        await sagaCollection('saga_rentals', user)!.add(payload);
+        const col = getBestCollection('saga_rentals');
+        if (col) await col.add(payload);
       }
       if (!silent) alert("Data Ganti Rugi Berhasil Disimpan");
     } catch (e) {
@@ -291,7 +292,8 @@ const RentalPage: React.FC<RentalPageProps> = ({ onBack, user }) => {
     if (!window.confirm("Hapus permanen data transaksi ini?")) return;
     if (db) {
       try {
-        await sagaCollection('saga_rentals', user)!.doc(id).delete();
+        const col = getBestCollection('saga_rentals');
+        if (col) await col.doc(id).delete();
       } catch (e) { alert("Gagal menghapus data di cloud."); }
     } else {
       const local = JSON.parse(localStorage.getItem(`saga_rentals_${appId}`) || '[]');

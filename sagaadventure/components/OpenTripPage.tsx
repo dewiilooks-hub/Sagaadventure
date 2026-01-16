@@ -16,8 +16,7 @@ import {
   HardHat, BookOpen, Info, PhoneCall, HeartPulse,
   XCircle
 } from 'lucide-react';
-import { db, appId } from '../services/firebase';
-import { sagaCollection } from '../services/dbPaths';
+import { db, appId, getBestCollection } from '../services/firebase';
 import { OpenTripTask, TripEvent, TripExpense, StaffAttendance } from '../types';
 import BrandLogo from './BrandLogo';
 import TicketPage from './TicketPage';
@@ -69,7 +68,7 @@ const OpenTripPage: React.FC<OpenTripPageProps> = ({ user, onBack }) => {
     name: '', date: '', pic: '', location: '', status: 'planning' as TripEvent['status']
   });
 
-  const isDemoMode = !db;
+  const isDemoMode = !db || !getBestCollection('saga_tasks') || !getBestCollection('saga_trips') || !getBestCollection('saga_attendance');
 
   // Load Data
   useEffect(() => {
@@ -83,24 +82,24 @@ const OpenTripPage: React.FC<OpenTripPageProps> = ({ user, onBack }) => {
       return;
     }
     
-    const tasksRef = sagaCollection('saga_tasks', user);
-    const tripsRef = sagaCollection('saga_trips', user);
-    const attendRef = sagaCollection('saga_attendance', user);
+    const tasksCol = getBestCollection('saga_tasks');
+    const tripsCol = getBestCollection('saga_trips');
+    const attendCol = getBestCollection('saga_attendance');
 
-    const unsubTasks = tasksRef!
+    const unsubTasks = tasksCol!
       .orderBy('createdAt', 'desc')
       .onSnapshot((s) => setTasks(s.docs.map(d => ({ id: d.id, ...d.data() })) as OpenTripTask[]));
 
-    const unsubTrips = tripsRef!
+    const unsubTrips = tripsCol!
       .orderBy('createdAt', 'desc')
       .onSnapshot((s) => setTrips(s.docs.map(d => ({ id: d.id, ...d.data() })) as TripEvent[]));
 
-    const unsubAttend = attendRef!
+    const unsubAttend = attendCol!
       .orderBy('timestamp', 'desc')
       .onSnapshot((s) => setAttendance(s.docs.map(d => ({ id: d.id, ...d.data() })) as StaffAttendance[]));
 
     return () => { unsubTasks(); unsubTrips(); unsubAttend(); };
-  }, [isDemoMode, user?.uid]);
+  }, [isDemoMode]);
 
   // Sync to LocalStorage
   useEffect(() => {
@@ -117,7 +116,8 @@ const OpenTripPage: React.FC<OpenTripPageProps> = ({ user, onBack }) => {
     if (isDemoMode) {
       setTrips([{ id: Date.now().toString(), ...data } as any, ...trips]);
     } else {
-      await sagaCollection('saga_trips', user)!.add(data);
+      const tripsCol = getBestCollection('saga_trips');
+      if (tripsCol) await tripsCol.add(data);
     }
     setTripForm({ name: '', date: '', pic: '', location: '', status: 'planning' });
     setShowAddProject(false);
@@ -129,7 +129,8 @@ const OpenTripPage: React.FC<OpenTripPageProps> = ({ user, onBack }) => {
     if (isDemoMode) {
       setAttendance([{ id: Date.now().toString(), ...data } as StaffAttendance, ...attendance]);
     } else {
-      await sagaCollection('saga_attendance', user)!.add(data);
+      const attendCol = getBestCollection('saga_attendance');
+      if (attendCol) await attendCol.add(data);
     }
     setAttendForm({ staffName: '', role: '', status: 'hadir', tripId: '' });
   };
@@ -139,7 +140,8 @@ const OpenTripPage: React.FC<OpenTripPageProps> = ({ user, onBack }) => {
     if (isDemoMode) {
       setAttendance(attendance.filter(a => a.id !== id));
     } else {
-      await sagaCollection('saga_attendance', user)!.doc(id).delete();
+      const attendCol = getBestCollection('saga_attendance');
+      if (attendCol) await attendCol.doc(id).delete();
     }
   };
 
@@ -149,7 +151,8 @@ const OpenTripPage: React.FC<OpenTripPageProps> = ({ user, onBack }) => {
       setTrips(trips.filter(t => t.id !== id));
     } else {
       try {
-        await sagaCollection('saga_trips', user)!.doc(id).delete();
+        const tripsCol = getBestCollection('saga_trips');
+        if (tripsCol) await tripsCol.doc(id).delete();
       } catch (err) {
         alert("Gagal menghapus proyek.");
       }
@@ -161,7 +164,8 @@ const OpenTripPage: React.FC<OpenTripPageProps> = ({ user, onBack }) => {
     if (isDemoMode) {
       setTasks([{ id: Date.now().toString(), ...finalData } as any, ...tasks]);
     } else {
-      await sagaCollection('saga_tasks', user)!.add(finalData);
+      const tasksCol = getBestCollection('saga_tasks');
+      if (tasksCol) await tasksCol.add(finalData);
     }
   };
 
@@ -183,7 +187,8 @@ const OpenTripPage: React.FC<OpenTripPageProps> = ({ user, onBack }) => {
     if (isDemoMode) {
       setTasks([{ id: Date.now().toString(), ...data } as any, ...tasks]);
     } else {
-      await sagaCollection('saga_tasks', user)!.add(data);
+      const tasksCol = getBestCollection('saga_tasks');
+      if (tasksCol) await tasksCol.add(data);
     }
     setFormData({ name: '', pic: '', qty: 1, unit: '', price: '', status: '', tripId: '' });
   };
@@ -199,7 +204,8 @@ const OpenTripPage: React.FC<OpenTripPageProps> = ({ user, onBack }) => {
     if (isDemoMode) {
         setTasks(tasks.map(t => t.id === id ? { ...t, ...updated } : t));
     } else {
-        await sagaCollection('saga_tasks', user)!.doc(id).update(updated);
+        const tasksCol = getBestCollection('saga_tasks');
+        if (tasksCol) await tasksCol.doc(id).update(updated);
     }
     setEditingId(null);
     setEditFormData(null);
@@ -211,7 +217,8 @@ const OpenTripPage: React.FC<OpenTripPageProps> = ({ user, onBack }) => {
         setTasks(tasks.filter(t => t.id !== id));
     } else {
         try {
-          await sagaCollection('saga_tasks', user)!.doc(id).delete();
+          const tasksCol = getBestCollection('saga_tasks');
+          if (tasksCol) await tasksCol.doc(id).delete();
         } catch (e) {
           alert("Gagal menghapus data.");
         }
@@ -242,7 +249,7 @@ const OpenTripPage: React.FC<OpenTripPageProps> = ({ user, onBack }) => {
   // View: Ticket System
   if (subView === 'ticket') {
     // Fixed: Correctly using setSubView instead of setSubTab
-    return <TicketPage user={user} onBack={() => setSubView('dashboard')} trips={trips} onSave={handleSaveFromTicket} />;
+    return <TicketPage onBack={() => setSubView('dashboard')} trips={trips} onSave={handleSaveFromTicket} />;
   }
 
   // View: Absensi Staff
@@ -715,7 +722,10 @@ const OpenTripPage: React.FC<OpenTripPageProps> = ({ user, onBack }) => {
                                <button onClick={async () => {
                                   const n = tasks.map(t => t.id === item.id ? { ...t, isDone: !t.isDone } : t);
                                   setTasks(n);
-                                  if (!isDemoMode) await sagaCollection('saga_tasks', user)!.doc(item.id).update({ isDone: !item.isDone });
+                                  if (!isDemoMode) {
+                                    const tasksCol = getBestCollection('saga_tasks');
+                                    if (tasksCol) await tasksCol.doc(item.id).update({ isDone: !item.isDone });
+                                  }
                                }} className={`w-6 h-6 rounded-lg mx-auto flex items-center justify-center transition-all ${item.isDone ? 'bg-emerald-500 text-white shadow-md' : 'bg-white text-stone-100 border'}`}>
                                   {item.isDone ? <CheckCircle2 size={12} /> : <Square size={12} />}
                                </button>
