@@ -111,26 +111,17 @@ const TicketPage: React.FC<TicketPageProps> = ({ onBack, trips = [], onSave }) =
   const downloadTicketPDF = async () => {
     if (!ticketRef.current) return;
     setIsProcessing(true);
-    const el = ticketRef.current;
     try {
-      // Wait until fonts are ready so html2canvas doesn't capture with wrong font metrics
-      // which can cause text to be clipped in the resulting canvas/PDF.
-      // @ts-ignore
-      if (document.fonts?.ready) await document.fonts.ready;
-
-      // Enable export-only CSS tweaks (keeps normal UI unchanged)
-      el.setAttribute('data-exporting', 'true');
-
       // Optimizing for High Resolution PDF output
-      const canvas = await html2canvas(el, { 
+      const canvas = await html2canvas(ticketRef.current, { 
         scale: 4, 
         useCORS: true,
         backgroundColor: "#ffffff",
         logging: false,
         scrollX: 0,
         scrollY: -window.scrollY,
-        windowWidth: el.scrollWidth,
-        windowHeight: el.scrollHeight
+        windowWidth: ticketRef.current.scrollWidth,
+        windowHeight: ticketRef.current.scrollHeight
       });
       
       const imgData = canvas.toDataURL('image/jpeg', 1.0);
@@ -146,7 +137,6 @@ const TicketPage: React.FC<TicketPageProps> = ({ onBack, trips = [], onSave }) =
       console.error(err);
       alert("Gagal mengunduh PDF tiket.");
     } finally {
-      el.removeAttribute('data-exporting');
       setIsProcessing(false);
     }
   };
@@ -439,7 +429,7 @@ const TicketPage: React.FC<TicketPageProps> = ({ onBack, trips = [], onSave }) =
 
                   <div className="mt-8 bg-black/60 border border-white/10 rounded-3xl p-6 flex flex-col">
                      <p className="text-[8px] uppercase font-black text-white/30 tracking-[0.2em] mb-2">Authenticated Ticket Holder</p>
-                     <p className="ticket-holder-name font-black text-2xl truncate uppercase tracking-tighter text-white leading-none mb-1">
+                     <p className="font-black text-2xl truncate uppercase tracking-tighter text-white leading-none mb-1">
                         {ticketData.guest || '........'}
                      </p>
                      <p className="text-[10px] font-bold text-white/50 tracking-wider">ID: {ticketData.id}</p>

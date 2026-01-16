@@ -2,59 +2,42 @@ import firebase from "firebase/compat/app";
 import "firebase/compat/auth";
 import "firebase/compat/firestore";
 
-// Global variable declarations for environment-specific configs
+// NOTE:
+// - This project is deployed for internal staff use.
+// - We hardcode the Firebase Web config to auto-connect (no Cloud Settings UI).
+// - Auth is REQUIRED (no anonymous sign-in).
+
 declare global {
-  var __firebase_config: string | undefined;
+  // Optional: If you later inject an app id from the hosting environment.
+  // Keeping this to avoid breaking existing code.
+  // eslint-disable-next-line no-var
   var __app_id: string | undefined;
-  var __initial_auth_token: string | undefined;
 }
+
+const firebaseConfig = {
+  apiKey: "AIzaSyAg13IhTcIa9589AIID4Rb5YZxbdFrh-h0",
+  authDomain: "sagaadventure-dd638.firebaseapp.com",
+  projectId: "sagaadventure-dd638",
+  storageBucket: "sagaadventure-dd638.firebasestorage.app",
+  messagingSenderId: "626572110187",
+  appId: "1:626572110187:web:be01813f1eecd02387042e",
+};
 
 let auth: firebase.auth.Auth | null = null;
 let db: firebase.firestore.Firestore | null = null;
 let isCloudEnabled = false;
 
-// Function to safely initialize Firebase
-const initializeFirebase = (config: any) => {
-  if (config && config.apiKey && config.apiKey !== "dummy") {
-    try {
-      // Use existing app if already initialized, or create new one
-      const app = !firebase.apps.length ? firebase.initializeApp(config) : firebase.app();
-      auth = app.auth();
-      db = app.firestore();
-      isCloudEnabled = true;
-      return true;
-    } catch (e) {
-      console.error("Firebase Init Error:", e);
-      return false;
-    }
-  }
-  return false;
-};
-
-// 1. Check for user-defined config in localStorage first (for cross-device manual setup)
-if (typeof window !== 'undefined') {
-  const savedConfig = localStorage.getItem('saga_user_firebase_config');
-  if (savedConfig) {
-    try {
-      initializeFirebase(JSON.parse(savedConfig));
-    } catch (e) {
-      console.warn("Saved Firebase config is invalid, clearing...");
-      localStorage.removeItem('saga_user_firebase_config');
-    }
-  }
-}
-
-// 2. Fallback to global config if not yet enabled
-if (!isCloudEnabled) {
-  const configStr = typeof window !== 'undefined' ? (window as any).__firebase_config : undefined;
-  if (configStr && configStr !== "{}" && !configStr.includes("YOUR_FIREBASE_CONFIG")) {
-    try {
-      initializeFirebase(JSON.parse(configStr));
-    } catch (error) {
-      console.warn("Global Firebase config failed to initialize");
-    }
-  }
+try {
+  const app = !firebase.apps.length ? firebase.initializeApp(firebaseConfig) : firebase.app();
+  auth = app.auth();
+  db = app.firestore();
+  isCloudEnabled = true;
+} catch (e) {
+  console.error("Firebase init failed:", e);
+  auth = null;
+  db = null;
+  isCloudEnabled = false;
 }
 
 export { auth, db, isCloudEnabled };
-export const appId = typeof (window as any).__app_id !== 'undefined' ? (window as any).__app_id : 'default-app-id';
+export const appId = typeof (window as any).__app_id !== "undefined" ? (window as any).__app_id : "default-app-id";
