@@ -1,0 +1,7 @@
+{
+  "name": "SAGA Adventure Gear",
+  "description": "A comprehensive management tool for adventure gear rentals, open trip checklists, and merchandise sales.",
+  "requestFramePermissions": [
+    "camera"
+  ]
+}
