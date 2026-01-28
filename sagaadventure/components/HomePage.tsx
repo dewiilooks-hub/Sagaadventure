@@ -1,6 +1,6 @@
 
 import React from 'react';
-import { Tent, Map, ShoppingBag, Lock, ChevronRight } from 'lucide-react';
+import { Tent, Map, ShoppingBag, Lock, ChevronRight, Crown } from 'lucide-react';
 import BrandLogo from './BrandLogo';
 import { ViewMode } from '../types';
 
@@ -37,8 +37,7 @@ interface HomePageProps {
 
 const HomePage: React.FC<HomePageProps> = ({ onNavigate, activeModule }) => {
   return (
-    <div className="p-8 flex flex-col gap-10 relative bg-white min-h-screen">
-      {/* Subtle Minimalist Watermark */}
+    <div className="p-8 flex flex-col gap-6 relative bg-white min-h-screen">
       <div className="absolute inset-0 flex items-center justify-center opacity-[0.015] pointer-events-none select-none">
         <span className="text-[6vw] font-normal tracking-[0.8em] uppercase whitespace-nowrap">SAGA ADVENTURE</span>
       </div>
@@ -75,6 +74,24 @@ const HomePage: React.FC<HomePageProps> = ({ onNavigate, activeModule }) => {
           isLocked={activeModule !== null && activeModule !== 'merch'}
         />
       </div>
+
+      <div className="h-px bg-stone-50 my-2"></div>
+
+      <button 
+        onClick={() => onNavigate('owner')}
+        className="bg-stone-950 text-white p-6 rounded-[2rem] flex items-center justify-between group active:scale-95 transition-all shadow-lg ring-4 ring-stone-50"
+      >
+        <div className="flex items-center gap-4">
+          <div className="bg-amber-500/20 p-3 rounded-xl border border-amber-500/20">
+            <Crown size={18} className="text-amber-500" />
+          </div>
+          <div>
+            <h3 className="text-[10px] font-black uppercase tracking-[0.2em]">Owner Portal</h3>
+            <p className="text-[8px] font-bold text-stone-500 uppercase tracking-widest mt-1">Tax & Royalty Center</p>
+          </div>
+        </div>
+        <Lock size={14} className="text-stone-700" />
+      </button>
       
       {activeModule && (
         <div className="mt-4 p-5 rounded-[1.5rem] bg-stone-50 border border-stone-100 flex items-center gap-4 animate-in fade-in duration-500">

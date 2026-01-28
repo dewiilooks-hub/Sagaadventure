@@ -1,3 +1,4 @@
+
 <!DOCTYPE html>
 <html lang="id">
 <head>
@@ -41,7 +42,7 @@
                 page-break-before: always !important;
             }
         }
-        /* Custom scrollbar for better aesthetics */
+
         ::-webkit-scrollbar {
           width: 5px;
         }
@@ -52,21 +53,30 @@
           background: #e5e5e5;
           border-radius: 10px;
         }
-        ::-webkit-scrollbar-thumb:hover {
-          background: #d4d4d4;
+        .no-scrollbar::-webkit-scrollbar {
+          display: none;
+        }
+        .no-scrollbar {
+          -ms-overflow-style: none;
+          scrollbar-width: none;
         }
     </style>
 <script type="importmap">
 {
   "imports": {
-    "firebase/app": "https://esm.sh/firebase@11.1.0/compat/app",
-    "firebase/auth": "https://esm.sh/firebase@11.1.0/compat/auth",
-    "firebase/firestore": "https://esm.sh/firebase@11.1.0/compat/firestore",
-    "react-dom/": "https://esm.sh/react-dom@^19.2.3/",
-    "react/": "https://esm.sh/react@^19.2.3/",
-    "react": "https://esm.sh/react@^19.2.3",
-    "lucide-react": "https://esm.sh/lucide-react@^0.562.0",
-    "firebase/": "https://esm.sh/firebase@^12.7.0/"
+    "react": "https://esm.sh/react@19.0.0",
+    "react-dom": "https://esm.sh/react-dom@19.0.0",
+    "react-dom/client": "https://esm.sh/react-dom@19.0.0/client",
+    "lucide-react": "https://esm.sh/lucide-react@0.460.0?external=react",
+    "firebase/compat/app": "https://esm.sh/firebase@11.1.0/compat/app",
+    "firebase/compat/auth": "https://esm.sh/firebase@11.1.0/compat/auth",
+    "firebase/compat/firestore": "https://esm.sh/firebase@11.1.0/compat/firestore",
+    "html2canvas": "https://esm.sh/html2canvas@1.4.1",
+    "jspdf": "https://esm.sh/jspdf@2.5.1",
+    "html5-qrcode": "https://esm.sh/html5-qrcode@2.3.8",
+    "react-dom/": "https://esm.sh/react-dom@^19.2.4/",
+    "react/": "https://esm.sh/react@^19.2.4/",
+    "firebase/": "https://esm.sh/firebase@^12.8.0/"
   }
 }
 </script>
@@ -74,6 +84,7 @@
 </head>
 <body class="bg-stone-50">
     <div id="root"></div>
+    <script type="module" src="index.tsx"></script>
 <script type="module" src="/index.tsx"></script>
 </body>
 </html>

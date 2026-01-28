@@ -1,3 +1,4 @@
+
 import React, { useState, useEffect } from 'react';
 // Fixed: Using compat import for Firebase v8 style code
 import firebase from 'firebase/compat/app';
@@ -15,10 +16,11 @@ import {
   HardHat, BookOpen, Info, PhoneCall, HeartPulse,
   XCircle, FileText, TrendingDown, Landmark, PieChart,
   Percent, Coins, HandCoins, Timer, Briefcase, Landmark as Bank,
-  History, ShoppingBag, ArrowUpRight, ArrowDownLeft, QrCode, Lock, KeyRound
+  History, ShoppingBag, ArrowUpRight, ArrowDownLeft, QrCode, Lock, KeyRound,
+  Handshake
 } from 'lucide-react';
 import { db, appId } from '../services/firebase';
-import { OpenTripTask, TripEvent, TripExpense, StaffAttendance, KasSpending } from '../types';
+import { OpenTripTask, TripEvent, StaffAttendance, KasSpending } from '../types';
 import BrandLogo from './BrandLogo';
 import TicketPage from './TicketPage';
 
@@ -31,7 +33,7 @@ interface OpenTripPageProps {
 
 const OpenTripPage: React.FC<OpenTripPageProps> = ({ user, onBack }) => {
   const [subView, setSubView] = useState<TripSubView>('dashboard');
-  const [activeTab, setActiveTab] = useState<'equip' | 'logistik' | 'operasional' | 'peserta'>('equip');
+  const [activeTab, setActiveTab] = useState<'equip' | 'logistik' | 'operasional' | 'peserta' | 'sponsor'>('equip');
   const [showInputRow, setShowInputRow] = useState(true); 
   const [showAddProject, setShowAddProject] = useState(false);
   const [showAddSpending, setShowAddSpending] = useState(false);
@@ -45,6 +47,7 @@ const OpenTripPage: React.FC<OpenTripPageProps> = ({ user, onBack }) => {
   const [pinError, setPinError] = useState(false);
 
   const MASTER_PIN = "2026";
+  const REDEMPTION_CUT = 10000;
 
   // Period Selection for Closing Report
   const [selectedMonth, setSelectedMonth] = useState(new Date().getMonth());
@@ -53,6 +56,7 @@ const OpenTripPage: React.FC<OpenTripPageProps> = ({ user, onBack }) => {
   // Accordion state for Trip Detail
   const [expandedSections, setExpandedSections] = useState<Record<string, boolean>>({
     manifest: true,
+    sponsor: false,
     equip: false,
     logistik: false,
     ops: false
@@ -214,17 +218,22 @@ const OpenTripPage: React.FC<OpenTripPageProps> = ({ user, onBack }) => {
 
   const handleAddTask = async () => {
     if (!formData.name.trim()) return alert("Nama Item Wajib Diisi");
+    
+    // Auto deduction for Peserta
+    let basePrice = parseInt(formData.price.toString()) || 0;
+    const finalPrice = activeTab === 'peserta' ? Math.max(0, basePrice - REDEMPTION_CUT) : basePrice;
+
     const data: any = { 
       task: formData.name, 
       pic: formData.pic || 'Admin', 
       qty: parseFloat(formData.qty.toString()) || 1,
       unit: activeTab === 'logistik' ? formData.unit : 'pcs',
-      price: parseInt(formData.price.toString()) || 0, 
-      status: formData.status || (activeTab === 'equip' ? 'ready' : activeTab === 'logistik' ? 'ready' : activeTab === 'peserta' ? 'paid' : 'biaya'),
+      price: finalPrice, 
+      status: formData.status || (activeTab === 'equip' ? 'ready' : activeTab === 'logistik' ? 'ready' : (activeTab === 'peserta' || activeTab === 'sponsor') ? 'paid' : 'biaya'),
       category: activeTab, 
       tripId: formData.tripId || '',
       ticketId: formData.ticketId || '',
-      isDone: activeTab === 'peserta' ? true : false, 
+      isDone: (activeTab === 'peserta' || activeTab === 'sponsor') ? true : false, 
       createdAt: new Date().toISOString()
     };
     
@@ -234,6 +243,9 @@ const OpenTripPage: React.FC<OpenTripPageProps> = ({ user, onBack }) => {
       await db!.collection('artifacts').doc(appId).collection('public').doc('data').collection('saga_tasks').add(data);
     }
     setFormData({ name: '', pic: '', qty: 1, unit: '', price: '', status: '', tripId: '', ticketId: '' });
+    if (activeTab === 'peserta') {
+      alert(`Peserta ditambahkan. Harga disesuaikan: Rp${basePrice.toLocaleString()} -> Rp${finalPrice.toLocaleString()} (Potong 10rb Saldo Redemption)`);
+    }
   };
 
   const handleSaveEdit = async (id: string) => {
@@ -347,7 +359,7 @@ const OpenTripPage: React.FC<OpenTripPageProps> = ({ user, onBack }) => {
         <div className="grid grid-cols-1 gap-4">
           <DashboardCard title="Master Project Hub" desc="Pusat Data & Finansial" icon={<Calendar size={24}/>} color="bg-stone-900" onClick={() => setSubView('trips')} />
           <DashboardCard title="Kas & Saldo Trip" desc="Simpanan 20% Akumulasi" icon={<Wallet size={24}/>} color="bg-emerald-800" isLocked onClick={() => openRestrictedView('kas')} />
-          <DashboardCard title="Checklist Ops" desc="Alat, Logistik & Peserta" icon={<ListChecks size={24}/>} color="bg-sky-600" onClick={() => setSubView('tasks')} />
+          <DashboardCard title="Checklist Ops" desc="Alat, Logistik, Peserta & Sponsor" icon={<ListChecks size={24}/>} color="bg-sky-600" onClick={() => setSubView('tasks')} />
           <DashboardCard title="Ticket System" desc="E-Ticket & Manifest Tamu" icon={<Ticket size={24}/>} color="bg-indigo-600" isLocked onClick={() => openRestrictedView('ticket')} />
           <DashboardCard title="Absensi Staff" desc="Kontrol Kehadiran Crew" icon={<ClipboardCheck size={24}/>} color="bg-slate-700" onClick={() => setSubView('attendance')} />
           <DashboardCard title="S&K Open Trip" desc="Proteksi Peserta & Owner" icon={<ShieldCheck size={24}/>} color="bg-orange-800" onClick={() => setSubView('terms_opentrip')} />
@@ -411,8 +423,9 @@ const OpenTripPage: React.FC<OpenTripPageProps> = ({ user, onBack }) => {
   if (subView === 'kas') {
     const allocations = trips.map(trip => {
       const pTasks = tasks.filter(t => t.tripId === trip.id);
-      const pRev = pTasks.filter(t => t.category === 'peserta' && t.status === 'paid').reduce((a, b) => a + b.price, 0);
-      const pExp = pTasks.filter(t => t.category !== 'peserta').reduce((a, b) => a + (b.price * b.qty), 0);
+      // Revenue from participants AND sponsors
+      const pRev = pTasks.filter(t => (t.category === 'peserta' || t.category === 'sponsor') && t.status === 'paid').reduce((a, b) => a + b.price, 0);
+      const pExp = pTasks.filter(t => t.category !== 'peserta' && t.category !== 'sponsor').reduce((a, b) => a + (b.price * b.qty), 0);
       const pNet = Math.max(0, pRev - pExp);
       const { kasTrip } = calculateSharing(pNet);
       return { id: trip.id, name: trip.name, date: trip.date, amount: kasTrip, profit: pNet, type: 'IN' as const };
@@ -516,7 +529,7 @@ const OpenTripPage: React.FC<OpenTripPageProps> = ({ user, onBack }) => {
                   <div key={idx} className="bg-white p-6 rounded-3xl border border-stone-100 flex items-center justify-between shadow-sm hover:shadow-md transition-all group">
                      <div className="flex items-center gap-4">
                         <div className={`p-3 rounded-2xl ${tx.type === 'IN' ? 'bg-emerald-50 text-emerald-600' : 'bg-rose-50 text-rose-600'}`}>
-                           {tx.type === 'IN' ? <ArrowDownLeft size={18}/> : <ArrowUpRight size={18}/>}
+                           {tx.type === 'IN' ? <ArrowDownLeft size={18}/ > : <ArrowUpRight size={18}/ >}
                         </div>
                         <div>
                            <h4 className="text-[11px] font-black text-stone-900 uppercase tracking-tight group-hover:text-stone-950 transition-colors">{tx.name || tx.item}</h4>
@@ -555,33 +568,38 @@ const OpenTripPage: React.FC<OpenTripPageProps> = ({ user, onBack }) => {
     const filteredTasks = tasks.filter(t => t.category === activeTab);
     return (
       <div className="flex flex-col h-screen bg-white">
-        <div className="px-6 py-5 border-b border-stone-100 flex items-center justify-between sticky top-0 bg-white z-50 print:hidden">
+        <div className="px-6 py-5 border-b border-stone-100 flex items-center justify-between sticky top-0 bg-white z-50 print:hidden shrink-0">
           <div className="flex items-center gap-4">
             <button onClick={() => setSubView('dashboard')} className="p-2 bg-stone-50 rounded-full text-stone-600 transition-all active:scale-95"><ChevronLeft size={16}/></button>
-            <h2 className="text-[10px] font-black uppercase tracking-[0.2em] text-stone-900">Checklist Ops & Peserta</h2>
+            <h2 className="text-[10px] font-black uppercase tracking-[0.2em] text-stone-900">Checklist Ops & Sponsor</h2>
           </div>
           <button onClick={() => setShowInputRow(!showInputRow)} className={`p-2.5 rounded-xl shadow-lg transition-all ${showInputRow ? 'bg-stone-900 text-white' : 'bg-stone-50 text-stone-400'}`}>
              {showInputRow ? <X size={20} /> : <PlusSquare size={22} />}
           </button>
         </div>
 
-        <div className="px-6 py-4 flex gap-2 bg-stone-50/20 border-b border-stone-50 print:hidden overflow-x-auto no-scrollbar">
+        <div className="px-6 py-4 flex gap-2 bg-stone-50/20 border-b border-stone-50 print:hidden overflow-x-auto no-scrollbar shrink-0">
           <TabButton active={activeTab === 'equip'} onClick={() => {setActiveTab('equip'); setEditingId(null);}} icon={<Tent size={14}/>} label="Equip" />
           <TabButton active={activeTab === 'logistik'} onClick={() => {setActiveTab('logistik'); setEditingId(null);}} icon={<Coffee size={14}/>} label="Logistik" />
-          <TabButton active={activeTab === 'peserta'} onClick={() => {setActiveTab('peserta'); setEditingId(null);}} icon={<Users size={14}/>} label="Peserta" />
           <TabButton active={activeTab === 'operasional'} onClick={() => {setActiveTab('operasional'); setEditingId(null);}} icon={<Calculator size={14}/>} label="Ops" />
+          <TabButton active={activeTab === 'peserta'} onClick={() => {setActiveTab('peserta'); setEditingId(null);}} icon={<Users size={14}/>} label="Peserta" />
+          <TabButton active={activeTab === 'sponsor'} onClick={() => {setActiveTab('sponsor'); setEditingId(null);}} icon={<Handshake size={14}/>} label="Sponsor" />
         </div>
 
         <div className="flex-1 overflow-auto bg-white flex flex-col pb-20">
           {showInputRow && (
-            <div className="bg-stone-50/40 border-b border-stone-100 p-6 space-y-4 animate-in slide-in-from-top-4">
+            <div className="bg-stone-50/40 border-b border-stone-100 p-6 space-y-4 animate-in slide-in-from-top-4 shrink-0">
                <div className="grid grid-cols-2 gap-4">
                   <div className="space-y-1">
-                    <label className="text-[7px] font-black text-stone-300 uppercase tracking-widest ml-1">{activeTab === 'peserta' ? 'Nama Peserta' : 'Nama Item'}</label>
+                    <label className="text-[7px] font-black text-stone-300 uppercase tracking-widest ml-1">
+                      {activeTab === 'peserta' ? 'Nama Peserta' : activeTab === 'sponsor' ? 'Nama Sponsor / Vendor' : 'Nama Item'}
+                    </label>
                     <input type="text" placeholder="..." className="w-full bg-white border border-stone-300 rounded-xl px-4 py-3 text-[11px] font-black uppercase outline-none shadow-sm text-stone-900 focus:ring-1 focus:ring-stone-400 transition-all" value={formData.name} onChange={e => setFormData({...formData, name: e.target.value})}/>
                   </div>
                   <div className="space-y-1">
-                    <label className="text-[7px] font-black text-stone-300 uppercase tracking-widest ml-1">{activeTab === 'peserta' ? 'Ticket ID (Manual)' : 'PIC Ops'}</label>
+                    <label className="text-[7px] font-black text-stone-300 uppercase tracking-widest ml-1">
+                      {activeTab === 'peserta' ? 'Ticket ID (Manual)' : activeTab === 'sponsor' ? 'PIC Sponsor' : 'PIC Ops'}
+                    </label>
                     <div className="relative">
                       <input type="text" placeholder={activeTab === 'peserta' ? 'SAGA-TIX-...' : 'PIC'} className="w-full bg-white border border-stone-300 rounded-xl px-4 py-3 text-[11px] font-black uppercase outline-none shadow-sm text-stone-900 focus:ring-1 focus:ring-stone-400 transition-all" value={activeTab === 'peserta' ? formData.ticketId : formData.pic} onChange={e => activeTab === 'peserta' ? setFormData({...formData, ticketId: e.target.value}) : setFormData({...formData, pic: e.target.value})}/>
                       {activeTab === 'peserta' && <QrCode size={14} className="absolute right-4 top-1/2 -translate-y-1/2 text-stone-300" />}
@@ -613,15 +631,20 @@ const OpenTripPage: React.FC<OpenTripPageProps> = ({ user, onBack }) => {
                    />
                  </div>
                  <div className="space-y-1">
-                   <label className="text-[7px] font-black text-stone-300 uppercase tracking-widest ml-1">Biaya (Rp)</label>
-                   <input type="number" className="w-full bg-white border border-stone-300 rounded-xl px-2 py-3 text-[11px] font-black outline-none shadow-sm text-right font-mono text-stone-900" placeholder="Rp" value={formData.price} onChange={e => setFormData({...formData, price: e.target.value})}/>
+                   <label className="text-[7px] font-black text-stone-300 uppercase tracking-widest ml-1">{activeTab === 'peserta' || activeTab === 'sponsor' ? 'Uang Masuk' : 'Biaya (Rp)'}</label>
+                   <div className="relative">
+                      <input type="number" className="w-full bg-white border border-stone-300 rounded-xl px-2 py-3 text-[11px] font-black outline-none shadow-sm text-right font-mono text-stone-900" placeholder="Rp" value={formData.price} onChange={e => setFormData({...formData, price: e.target.value})}/>
+                      {activeTab === 'peserta' && formData.price && (
+                        <div className="absolute left-0 -bottom-4 text-[6px] font-black text-indigo-500 uppercase tracking-tighter">Net: Rp{(Math.max(0, (parseInt(formData.price) || 0) - REDEMPTION_CUT)).toLocaleString()} (Auto -10rb)</div>
+                      )}
+                   </div>
                  </div>
                  <div className="space-y-1">
                    <label className="text-[7px] font-black text-stone-300 uppercase tracking-widest ml-1">Status</label>
                    <select className="w-full bg-white border border-stone-300 rounded-xl py-3 text-[9px] font-black uppercase outline-none px-1 shadow-sm text-stone-900" value={formData.status} onChange={e => setFormData({...formData, status: e.target.value})}>
+                     {(activeTab === 'peserta' || activeTab === 'sponsor') ? <><option value="paid">PAID</option><option value="unpaid">UNPAID</option></> : null}
                      {activeTab === 'equip' && <><option value="ready">READY</option><option value="rent">RENT</option></>}
                      {activeTab === 'logistik' && <><option value="ready">READY</option><option value="buy">BUY</option></>}
-                     {activeTab === 'peserta' && <><option value="paid">PAID</option><option value="unpaid">UNPAID</option></>}
                      {activeTab === 'operasional' && <><option value="biaya">BIAYA</option></>}
                    </select>
                  </div>
@@ -642,11 +665,11 @@ const OpenTripPage: React.FC<OpenTripPageProps> = ({ user, onBack }) => {
                   <thead className="bg-stone-50 border-b border-stone-100 sticky top-0 z-20">
                      <tr className="text-[8px] font-black text-stone-400 uppercase tracking-widest">
                         <th className="py-5 px-6 w-16 text-center">Cek</th>
-                        <th className="py-5 px-4 w-64">Nama Item / Peserta</th>
-                        <th className="py-5 px-4 w-40">Ticket ID / PIC</th>
+                        <th className="py-5 px-4 w-64">{activeTab === 'sponsor' ? 'Nama Sponsor' : 'Nama Item / Peserta'}</th>
+                        <th className="py-5 px-4 w-40">{activeTab === 'sponsor' ? 'PIC Sponsor' : 'Ticket ID / PIC'}</th>
                         <th className="py-5 px-4 w-24 text-center">Qty / Unit</th>
-                        <th className="py-5 px-4 w-32 text-right">Harga</th>
-                        {activeTab !== 'peserta' && <th className="py-5 px-4 w-32 text-right">Total Biaya</th>}
+                        <th className="py-5 px-4 w-32 text-right">{activeTab === 'sponsor' || activeTab === 'peserta' ? 'Income (Net)' : 'Harga'}</th>
+                        {activeTab !== 'peserta' && activeTab !== 'sponsor' && <th className="py-5 px-4 w-32 text-right">Total Biaya</th>}
                         <th className="py-5 px-4 w-28 text-center">Status</th>
                         <th className="py-5 px-4 w-28 text-center">Aksi</th>
                      </tr>
@@ -655,7 +678,7 @@ const OpenTripPage: React.FC<OpenTripPageProps> = ({ user, onBack }) => {
                      {filteredTasks.map(item => {
                        const isEditing = editingId === item.id;
                        return (
-                         <tr key={item.id} className={`group hover:bg-stone-50/30 transition-all ${item.isDone ? 'bg-emerald-50/20' : ''}`}>
+                         <tr key={item.id} className={`group hover:bg-stone-50/30 transition-all ${(item.isDone || item.status === 'paid') ? 'bg-emerald-50/20' : ''}`}>
                             <td className="py-3 px-6 text-center">
                                <button onClick={async () => {
                                   const n = tasks.map(t => t.id === item.id ? { ...t, isDone: !t.isDone } : t);
@@ -681,9 +704,9 @@ const OpenTripPage: React.FC<OpenTripPageProps> = ({ user, onBack }) => {
                                ) : (
                                  <div className="flex items-center gap-2">
                                    {activeTab === 'peserta' ? (
-                                     <div className="flex items-center gap-1.5 bg-indigo-50 px-2 py-1 rounded-md border border-indigo-100/50">
+                                     <div className="flex items-center gap-1.5 bg-indigo-50 px-2 py-1 rounded w-fit">
                                        <Ticket size={10} className="text-indigo-400" />
-                                       <span className="text-[10px] font-mono font-black text-indigo-600 uppercase tracking-tighter">{item.ticketId || 'NO-ID'}</span>
+                                       <span className="text-[10px] font-mono font-bold text-indigo-600 uppercase tracking-tighter">{item.ticketId || 'NO-ID'}</span>
                                      </div>
                                    ) : (
                                      <span className="text-[10px] font-bold uppercase text-stone-400 tracking-tight">{item.pic || 'ADMIN'}</span>
@@ -702,10 +725,13 @@ const OpenTripPage: React.FC<OpenTripPageProps> = ({ user, onBack }) => {
                                {isEditing ? (
                                  <input className="w-full bg-white border border-stone-300 rounded-lg px-2 py-2 text-[11px] font-black text-right text-stone-900 outline-none focus:ring-1 focus:ring-indigo-400" value={editFormData.price} onChange={e => setEditFormData({...editFormData, price: e.target.value})} />
                                ) : (
-                                 <span className="text-[10px] font-black font-mono text-stone-800">Rp{item.price.toLocaleString('id-ID')}</span>
+                                 <div className="flex flex-col items-end">
+                                    <span className={`text-[10px] font-black font-mono ${activeTab === 'sponsor' || activeTab === 'peserta' ? 'text-emerald-700' : 'text-stone-800'}`}>Rp{item.price.toLocaleString('id-ID')}</span>
+                                    {activeTab === 'peserta' && <span className="text-[6px] font-black text-stone-300 uppercase tracking-tighter">After -10rb Share</span>}
+                                 </div>
                                )}
                             </td>
-                            {activeTab !== 'peserta' && (
+                            {activeTab !== 'peserta' && activeTab !== 'sponsor' && (
                               <td className="py-3 px-4 text-right">
                                 <span className="text-[10px] font-black text-stone-950 font-mono bg-stone-50/50 px-2 py-1 rounded">
                                   Rp{(item.price * item.qty).toLocaleString('id-ID')}
@@ -715,9 +741,9 @@ const OpenTripPage: React.FC<OpenTripPageProps> = ({ user, onBack }) => {
                             <td className="py-3 px-4 text-center">
                                {isEditing ? (
                                  <select className="text-[9px] font-black border border-stone-300 rounded-lg px-1 py-2 bg-white text-stone-900 outline-none focus:ring-1 focus:ring-indigo-400" value={editFormData.status} onChange={e => setEditFormData({...editFormData, status: e.target.value})}>
+                                    {(activeTab === 'peserta' || activeTab === 'sponsor') && <><option value="paid">PAID</option><option value="unpaid">UNPAID</option></>}
                                     {activeTab === 'equip' && <><option value="ready">READY</option><option value="rent">RENT</option></>}
                                     {activeTab === 'logistik' && <><option value="ready">READY</option><option value="buy">BUY</option></>}
-                                    {activeTab === 'peserta' && <><option value="paid">PAID</option><option value="unpaid">UNPAID</option></>}
                                     {activeTab === 'operasional' && <><option value="biaya">BIAYA</option></>}
                                  </select>
                                ) : (
@@ -827,7 +853,11 @@ const OpenTripPage: React.FC<OpenTripPageProps> = ({ user, onBack }) => {
             <div className={`bg-white w-full max-w-sm rounded-[3rem] shadow-2xl overflow-hidden border border-stone-100 animate-in zoom-in-95 duration-300 ${pinError ? 'animate-shake border-rose-200' : ''}`}>
                <div className="bg-rose-950 p-10 text-white text-center">
                   <div className="p-4 bg-white/10 rounded-full w-fit mx-auto mb-6">
-                    <ShieldAlert size={32} className={pinError ? 'text-rose-400' : 'text-amber-400'} />
+                    {pendingDeleteTripId ? (
+                      <ShieldAlert size={32} className={pinError ? 'text-rose-400' : 'text-amber-400'} />
+                    ) : (
+                      <Lock size={32} className={pinError ? 'text-rose-400' : 'text-emerald-400'} />
+                    )}
                   </div>
                   <h3 className="text-xl font-black uppercase tracking-tighter">Deletion Shield</h3>
                   <p className="text-[10px] font-black uppercase tracking-widest text-white/40 mt-1">Authorized Access Only</p>
@@ -868,11 +898,16 @@ const OpenTripPage: React.FC<OpenTripPageProps> = ({ user, onBack }) => {
   if (subView === 'trip_detail' && selectedTrip) {
     const tripTasks = tasks.filter(t => t.tripId === selectedTrip.id);
     const tripParticipants = tripTasks.filter(t => t.category === 'peserta');
+    const tripSponsors = tripTasks.filter(t => t.category === 'sponsor');
     const tripEquip = tripTasks.filter(t => t.category === 'equip');
     const tripLogistik = tripTasks.filter(t => t.category === 'logistik');
     const tripOperasional = tripTasks.filter(t => t.category === 'operasional');
 
-    const totalIncome = tripParticipants.filter(t => t.status === 'paid').reduce((a,b) => a + b.price, 0);
+    // Income from both Participants and Sponsors
+    const totalParticipantIncome = tripParticipants.filter(t => t.status === 'paid').reduce((a,b) => a + b.price, 0);
+    const totalSponsorIncome = tripSponsors.filter(t => t.status === 'paid').reduce((a,b) => a + b.price, 0);
+    const totalIncome = totalParticipantIncome + totalSponsorIncome;
+
     const totalOutEquip = tripEquip.reduce((a,b) => a + (b.price * b.qty), 0);
     const totalOutLogistik = tripLogistik.reduce((a,b) => a + (b.price * b.qty), 0);
     const totalOutOps = tripOperasional.reduce((a,b) => a + (b.price * b.qty), 0);
@@ -906,7 +941,9 @@ const OpenTripPage: React.FC<OpenTripPageProps> = ({ user, onBack }) => {
                  <div className="relative z-10">
                     <span className="text-[9px] font-black text-white/30 uppercase tracking-[0.3em] block mb-3">Gross Project Revenue</span>
                     <p className="text-3xl font-black font-mono tracking-tighter">Rp{totalIncome.toLocaleString('id-ID')}</p>
-                    <p className="text-[7px] font-black text-emerald-400 uppercase tracking-[0.2em] mt-2 flex items-center gap-1"><CheckCircle2 size={8}/> From Verified Paid Manifest</p>
+                    <p className="text-[7px] font-black text-emerald-400 uppercase tracking-[0.2em] mt-2 flex items-center gap-1">
+                      <CheckCircle2 size={8}/> Total (Participants + Sponsors)
+                    </p>
                  </div>
                  <Landmark size={64} className="opacity-10 absolute -right-2 -bottom-2 group-hover:scale-110 transition-transform" />
               </div>
@@ -925,7 +962,7 @@ const OpenTripPage: React.FC<OpenTripPageProps> = ({ user, onBack }) => {
                 id="manifest"
                 title="1. Manifest & Tiketing" 
                 icon={<Ticket size={16}/>} 
-                summary={`Total: Rp${totalIncome.toLocaleString('id-ID')}`}
+                summary={`Total: Rp${totalParticipantIncome.toLocaleString('id-ID')}`}
                 isExpanded={expandedSections.manifest}
                 onToggle={() => toggleSection('manifest')}
               >
@@ -934,7 +971,7 @@ const OpenTripPage: React.FC<OpenTripPageProps> = ({ user, onBack }) => {
                     <tr className="text-[8px] font-black text-stone-400 uppercase tracking-[0.2em]">
                       <th className="py-5 px-6">Nama Peserta</th>
                       <th className="py-5 px-6">Ticket Reference</th>
-                      <th className="py-5 px-6 text-right">Fare Paid</th>
+                      <th className="py-5 px-6 text-right">Fare Paid (Net)</th>
                       <th className="py-5 px-6 text-center">Audit</th>
                     </tr>
                   </thead>
@@ -968,8 +1005,51 @@ const OpenTripPage: React.FC<OpenTripPageProps> = ({ user, onBack }) => {
               </CollapsibleTable>
 
               <CollapsibleTable 
+                id="sponsor"
+                title="2. Sponsorship Entry" 
+                icon={<Handshake size={16}/>} 
+                summary={`Total: Rp${totalSponsorIncome.toLocaleString('id-ID')}`}
+                isExpanded={expandedSections.sponsor}
+                onToggle={() => toggleSection('sponsor')}
+              >
+                <table className="w-full text-left border-collapse">
+                  <thead className="bg-stone-50/80 border-b border-stone-100">
+                    <tr className="text-[8px] font-black text-stone-400 uppercase tracking-[0.2em]">
+                      <th className="py-5 px-6">Nama Sponsor / Vendor</th>
+                      <th className="py-5 px-6">PIC Sponsor</th>
+                      <th className="py-5 px-6 text-right">Income</th>
+                      <th className="py-5 px-6 text-center">Status</th>
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y divide-stone-50">
+                    {tripSponsors.length === 0 ? (
+                      <tr><td colSpan={4} className="py-16 text-center opacity-20 text-[10px] font-black uppercase tracking-widest italic">No sponsors yet</td></tr>
+                    ) : (
+                      tripSponsors.map(s => (
+                        <tr key={s.id} className="hover:bg-stone-50 transition-colors">
+                          <td className="py-5 px-6">
+                            <p className="text-[11px] font-black text-stone-900 uppercase">{s.task}</p>
+                            <p className="text-[7px] font-bold text-stone-300 uppercase tracking-widest">OFFICIAL PARTNER</p>
+                          </td>
+                          <td className="py-5 px-6">
+                             <span className="text-[10px] font-bold text-stone-500 uppercase">{s.pic || 'GENERIC'}</span>
+                          </td>
+                          <td className="py-5 px-6 text-right font-black font-mono text-emerald-700 text-[11px]">Rp{s.price.toLocaleString('id-ID')}</td>
+                          <td className="py-5 px-6 text-center">
+                            <span className={`px-2.5 py-1 rounded-full text-[7px] font-black uppercase border shadow-sm ${s.status === 'paid' ? 'bg-emerald-50 text-emerald-700 border-emerald-100' : 'bg-orange-50 text-orange-700 border-orange-100'}`}>
+                              {s.status}
+                            </span>
+                          </td>
+                        </tr>
+                      ))
+                    )}
+                  </tbody>
+                </table>
+              </CollapsibleTable>
+
+              <CollapsibleTable 
                 id="equip"
-                title="2. Master Peralatan" 
+                title="3. Master Peralatan" 
                 icon={<Tent size={16}/>} 
                 summary={`Rp${totalOutEquip.toLocaleString('id-ID')}`}
                 isExpanded={expandedSections.equip}
@@ -1003,7 +1083,7 @@ const OpenTripPage: React.FC<OpenTripPageProps> = ({ user, onBack }) => {
 
               <CollapsibleTable 
                 id="logistik"
-                title="3. Food & Logistics" 
+                title="4. Food & Logistics" 
                 icon={<Coffee size={16}/>} 
                 summary={`Rp${totalOutLogistik.toLocaleString('id-ID')}`}
                 isExpanded={expandedSections.logistik}
@@ -1037,7 +1117,7 @@ const OpenTripPage: React.FC<OpenTripPageProps> = ({ user, onBack }) => {
 
               <CollapsibleTable 
                 id="ops"
-                title="4. Operational Expenses" 
+                title="5. Operational Expenses" 
                 icon={<Calculator size={16}/>} 
                 summary={`Rp${totalOutOps.toLocaleString('id-ID')}`}
                 isExpanded={expandedSections.ops}
@@ -1226,7 +1306,8 @@ const OpenTripPage: React.FC<OpenTripPageProps> = ({ user, onBack }) => {
        return d.getMonth() === selectedMonth && d.getFullYear() === selectedYear;
     });
 
-    const participantsAll = filteredTasks.filter(t => t.category === 'peserta' && t.status === 'paid');
+    // Revenue from Participants AND Sponsors
+    const participantsAll = filteredTasks.filter(t => (t.category === 'peserta' || t.category === 'sponsor') && t.status === 'paid');
     const totalRevAll = participantsAll.reduce((a, b) => a + b.price, 0);
     
     const equipExpAll = filteredTasks.filter(t => t.category === 'equip').reduce((a, b) => a + (b.price * b.qty), 0);
@@ -1314,8 +1395,9 @@ const OpenTripPage: React.FC<OpenTripPageProps> = ({ user, onBack }) => {
                   if (!project) return null;
 
                   const pTasks = filteredTasks.filter(t => t.tripId === pid);
-                  const pRev = pTasks.filter(t => t.category === 'peserta' && t.status === 'paid').reduce((a, b) => a + b.price, 0);
-                  const pExp = pTasks.filter(t => t.category !== 'peserta').reduce((a, b) => a + (b.price * b.qty), 0);
+                  // Net calculation includes Sponsors
+                  const pRev = pTasks.filter(t => (t.category === 'peserta' || t.category === 'sponsor') && t.status === 'paid').reduce((a, b) => a + b.price, 0);
+                  const pExp = pTasks.filter(t => t.category !== 'peserta' && t.category !== 'sponsor').reduce((a, b) => a + (b.price * b.qty), 0);
                   const pNet = Math.max(0, pRev - pExp);
 
                   const { royalty, kasTrip, team: teamPool } = calculateSharing(pNet);
@@ -1393,7 +1475,7 @@ const OpenTripPage: React.FC<OpenTripPageProps> = ({ user, onBack }) => {
               <h3 className="text-[11px] font-black text-stone-900 uppercase tracking-[0.3em] bg-stone-50 px-4 py-2 w-fit rounded-full flex items-center gap-2"><TrendingUp size={14}/> Period Summary</h3>
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                  <div className="p-8 bg-stone-50 rounded-[2rem] border border-stone-100 text-center flex flex-col items-center justify-center space-y-2">
-                    <p className="text-4xl font-black text-stone-900 leading-none">{participantsAll.length}</p>
+                    <p className="text-4xl font-black text-stone-900 leading-none">{filteredTasks.filter(t => t.category === 'peserta' && t.status === 'paid').length}</p>
                     <p className="text-[10px] font-black text-stone-300 uppercase tracking-widest mt-2">Paid Participants (Pax)</p>
                  </div>
                  <div className="p-8 bg-stone-50 rounded-[2rem] border border-stone-100 text-center flex flex-col items-center justify-center space-y-2">

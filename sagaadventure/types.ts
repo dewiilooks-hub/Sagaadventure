@@ -15,16 +15,16 @@ export interface CustomRentalItem {
 
 export interface OpenTripTask {
   id: string;
-  tripId?: string; // Menghubungkan tugas/peserta ke trip tertentu
-  task: string; // Nama Barang / Nama Peserta / Nama Biaya
+  tripId?: string;
+  task: string;
   pic: string;
   qty: number;
-  unit?: string; // Digunakan untuk 'gram/kg' di logistik
-  price: number; // Harga / Uang Masuk
-  status: string; // Buy/Rent/Stok/Paid/Unpaid/Ready
-  category: 'equip' | 'logistik' | 'peserta' | 'operasional';
-  isDone: boolean; // Kolom Ceklis
-  ticketId?: string; // Menyimpan ID Tiket untuk kategori peserta
+  unit?: string;
+  price: number;
+  status: string;
+  category: 'equip' | 'logistik' | 'peserta' | 'operasional' | 'sponsor';
+  isDone: boolean;
+  ticketId?: string;
   createdAt: any;
 }
 
@@ -37,11 +37,12 @@ export interface StaffAttendance {
   timestamp: string;
 }
 
-export interface Participant {
-  id: string;
-  name: string;
-  payment: number;
-  status: 'unpaid' | 'partial' | 'paid';
+export interface MerchInvoice {
+  id?: string;
+  invoiceId: string;
+  customer: string;
+  items: any[];
+  total: number;
   createdAt: any;
 }
 
@@ -49,18 +50,9 @@ export interface TripEvent {
   id: string;
   name: string;
   date: string;
-  pic: string; // Penanggung Jawab
-  location: string; // Lokasi Event
+  pic: string;
+  location: string;
   status: 'planning' | 'active' | 'completed';
-  createdAt: any;
-}
-
-export interface TripExpense {
-  id: string;
-  tripId: string;
-  description: string;
-  amount: number;
-  category: 'logistik' | 'transport' | 'crew' | 'alat' | 'lainnya';
   createdAt: any;
 }
 
@@ -74,4 +66,22 @@ export interface KasSpending {
   createdAt: string;
 }
 
-export type ViewMode = 'home' | 'rental' | 'trip' | 'merch';
+export interface RentalSpending {
+  id: string;
+  item: string;
+  amount: number;
+  date: string;
+  category: 'maintenance' | 'purchase';
+  createdAt: any;
+}
+
+export interface OwnerPayout {
+  id: string;
+  amount: number;
+  month: number;
+  year: number;
+  distributedTo: string;
+  createdAt: any;
+}
+
+export type ViewMode = 'home' | 'rental' | 'trip' | 'merch' | 'owner';
